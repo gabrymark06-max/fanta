@@ -165,19 +165,41 @@ def application(environ, start_response):
     return _applicazione(environ, start_response)
 
 
-def registra_webhook(url: str, segreto: str = "") -> dict:
-    """Dice a Telegram dove bussare. Si lancia una volta, da qualunque parte."""
+def registra_webhook(url: str, segreto: str = "", tentativi: int = 5) -> dict:
+    """Dice a Telegram dove bussare. Si lancia una volta, da qualunque parte.
+
+    RIPROVA, e non per pignoleria. Su PythonAnywhere gratis le richieste in
+    uscita passano da un proxy condiviso che ogni tanto risponde 503 anche
+    verso un indirizzo permesso: e' un intoppo di un momento, non un divieto.
+    Un solo tentativo trasforma quel momento in "non funziona", e la
+    differenza fra le due cose e' un pomeriggio.
+    """
+    import time
+
     import httpx
 
     cfg = impostazioni()
-    risposta = httpx.post(
-        f"https://api.telegram.org/bot{cfg.token_telegram}/setWebhook",
-        json={
-            "url": url,
-            "secret_token": segreto or os.environ.get("TELEGRAM_WEBHOOK_SECRET", ""),
-            "drop_pending_updates": True,
-            "allowed_updates": ["message", "callback_query"],
-        },
-        timeout=30,
-    )
-    return risposta.json()
+    dati = {
+        "url": url,
+        "secret_token": segreto or os.environ.get("TELEGRAM_WEBHOOK_SECRET", ""),
+        "drop_pending_updates": True,
+        "allowed_updates": ["message", "callback_query"],
+    }
+    ultimo: Exception | None = None
+    for tentativo in range(tentativi):
+        try:
+            risposta = httpx.post(
+                f"https://api.telegram.org/bot{cfg.token_telegram}/setWebhook",
+                json=dati,
+                timeout=30,
+            )
+            return risposta.json()
+        except httpx.HTTPError as e:
+            ultimo = e
+            attesa = 2 ** tentativo
+            log.warning("setWebhook fallito (%s), riprovo fra %ss", e, attesa)
+            time.sleep(attesa)
+    return {
+        "ok": False,
+        "description": f"non ci sono riuscito in {tentativi} tentativi: {ultimo}",
+    }
