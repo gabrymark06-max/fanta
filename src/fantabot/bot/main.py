@@ -1213,7 +1213,16 @@ async def errore(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
-def costruisci(conn: sqlite3.Connection | None = None) -> Application:
+def costruisci(
+    conn: sqlite3.Connection | None = None, *, aggiorna_da_solo: bool = True
+) -> Application:
+    """Il bot montato, comandi e lavori periodici.
+
+    `aggiorna_da_solo` si spegne quando le fonti le legge qualcun altro —
+    su PythonAnywhere gratis, dove la whitelist non lascia uscire, i dati
+    arrivano gia' pronti da GitHub Actions e un lavoro che prova a
+    scaricarli da qui riuscirebbe solo a riempire i log di errori.
+    """
     cfg = impostazioni()
     if not cfg.token_telegram:
         raise SystemExit(
@@ -1273,7 +1282,9 @@ def costruisci(conn: sqlite3.Connection | None = None) -> Application:
     #
     # Il primo giro parte dopo un minuto e non subito: all'avvio si vuole un
     # bot che risponde, non un bot che sta scaricando.
-    if app.job_queue is not None:
+    if not aggiorna_da_solo:
+        log.info("aggiornamento automatico spento: i dati arrivano da fuori")
+    elif app.job_queue is not None:
         app.job_queue.run_repeating(
             rinfresca,
             interval=ORE_FRA_GLI_AGGIORNAMENTI * 3600,

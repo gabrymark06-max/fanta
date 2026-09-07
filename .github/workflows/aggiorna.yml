@@ -1,0 +1,44 @@
+name: Aggiorna i dati e spediscili al bot
+
+# PERCHE' QUI E NON SUL BOT. PythonAnywhere gratis raggiunge solo i siti di una
+# whitelist: c'e' api.telegram.org, non ci sono fantacalcio.it, fotmob e
+# sportsgambler. GitHub Actions invece esce ovunque e, su un repository
+# pubblico, non costa niente. Quindi il mondo lo legge questo workflow e il bot
+# riceve il risultato gia' pronto.
+
+on:
+  schedule:
+    # Ogni sei ore. Gli infortunati e le formazioni previste cambiano piu'
+    # volte al giorno, e cambiano soprattutto fra venerdi' e domenica mattina.
+    # I minuti d'esecuzione sono sfalsati apposta: le :00 sono l'ora di punta
+    # di GitHub e i job schedulati partono in ritardo.
+    - cron: "17 4,10,16,22 * * *"
+  workflow_dispatch:
+
+concurrency:
+  # Due esecuzioni insieme si sovrascriverebbero il pacco a vicenda.
+  group: pubblica
+  cancel-in-progress: false
+
+jobs:
+  pubblica:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Installa
+        run: pip install -e .
+
+      - name: Leggi le fonti e spedisci
+        env:
+          PA_UTENTE: ${{ secrets.PA_UTENTE }}
+          PA_TOKEN: ${{ secrets.PA_TOKEN }}
+          PA_DOMINIO: ${{ secrets.PA_DOMINIO }}
+          PA_PERCORSO: ${{ secrets.PA_PERCORSO }}
+        run: python scripts/pubblica.py

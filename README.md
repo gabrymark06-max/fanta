@@ -586,16 +586,88 @@ tutto il resto, e la forma sbagliata di hosting non è più lenta — è impossi
 è un ripiego: è il modo per cui il database è SQLite invece di Postgres. Zero
 costo, internet pieno, e nessun deploy da fare nell'ora in cui serve.
 
-**Per la stagione, se lo vuoi acceso senza il PC: PythonAnywhere a pagamento**
-(piano Developer, $10/mese — il vecchio Hacker da $5 non esiste più). Dà **una
-always-on task** e **internet senza restrizioni**, che sono esattamente le due
-cose che servono. Non c'è una riga da cambiare: `git pull`, `.env`, e la task
-lancia `python -m fantabot.bot.main`.
+**Per la stagione, gratis: GitHub Actions legge, PythonAnywhere risponde.**
+È la strada che il progetto implementa, ed è gratuita perché gira i vincoli
+invece di pagarli.
 
-**PythonAnywhere gratis non basta**, e non per poco: gli account gratuiti
-raggiungono solo i siti di una whitelist. `api.telegram.org` c'è —
-fantacalcio.it, fotmob e sportsgambler **no**. Il bot risponderebbe ai comandi
-e non saprebbe niente: né listone, né minuti, né infortuni, né squalifiche.
+```
+GitHub Actions            PythonAnywhere (free)         Telegram
+──────────────            ─────────────────────         ────────
+ogni 6 ore
+  legge le fonti  ──────► carica riferimento.sqlite3
+  (internet pieno)        reload della web app
+                            │
+                            └─ all'avvio: assorbe    ◄──►  webhook
+                               solo le tabelle
+                               rileggibili
+```
+
+Tre fatti la reggono, e vanno letti insieme:
+
+- **la whitelist blocca le uscite, non le entrate.** Telegram arriva senza
+  problemi, e la sola uscita che serve — `api.telegram.org`, per rispondere —
+  è l'unica che la whitelist permette;
+- **le web app non consumano CPU-seconds**, mentre consoles e task sì. Il bot
+  vive nella sola parte del piano gratuito che non ha un contatore;
+- **le fonti le legge Actions**, che esce ovunque e su un repository pubblico
+  non costa niente.
+
+Il prezzo è che non si può fare polling: senza always-on task, il bot dev'essere
+*chiamato*. Quindi `wsgi.py` + `src/fantabot/bot/web.py` servono i webhook,
+autenticati con `X-Telegram-Bot-Api-Secret-Token` — l'indirizzo non è una
+password, e chi lo indovina trova un 403.
+
+#### La trappola, che è il motivo per cui non basta un `scp`
+
+Il database contiene due cose nello stesso file: quello che si **rilegge** dal
+mondo (listone, statistiche, minuti, infortuni, squalifiche, calendario,
+abbinamenti) e quello che **esiste solo lì** — la tua lega, le rose, i prezzi
+pagati, i tuoi obiettivi, e il foglio delle fasce che hai caricato da Telegram.
+
+Sovrascrivere il file intero avrebbe funzionato benissimo per undici giorni e
+poi, il dodicesimo, avrebbe **cancellato l'asta a metà asta**. Quindi
+`dati/sincronizza.py` sostituisce solo le tabelle rileggibili, in una
+transazione sola, e le altre non le apre nemmeno. Ogni tabella dello schema
+deve stare in esattamente uno dei due elenchi, e **un test lo verifica**: una
+migrazione futura che ne aggiunge una senza classificarla fa fallire la suite,
+invece di far sparire dei dati sei mesi dopo.
+
+Due dettagli che nascono dalla stessa logica: una tabella che arriva **vuota**
+non sostituisce quella di prima (è una lettura andata male dall'altra parte,
+non un aggiornamento), e `andamento` — la storia giornata per giornata — non
+viaggia affatto: si ricostruisce sul posto appena arrivano statistiche nuove,
+perché Actions riparte ogni volta da capo e la sua storia sarebbe lunga una
+riga sola.
+
+#### Cosa serve configurare
+
+Segreti del repository (`gh secret set`), tutti già impostabili senza toccare
+il codice:
+
+| Segreto | Cos'è |
+|---|---|
+| `PA_TOKEN` | PythonAnywhere → Account → API Token |
+| `PA_UTENTE` | il tuo username lì |
+| `PA_DOMINIO` | `utente.pythonanywhere.com` |
+| `PA_PERCORSO` | dove sta il progetto, es. `/home/utente/fanta` |
+
+Sul lato PythonAnywhere: `git clone`, un `.env` con token, `UTENTI_AMMESSI` e
+`TELEGRAM_WEBHOOK_SECRET`, il file WSGI che importa `wsgi.py`, e una volta sola
+
+```python
+from fantabot.bot.web import registra_webhook
+registra_webhook("https://utente.pythonanywhere.com/telegram/")
+```
+
+**Due cose da sapere del piano gratuito**: la web app va **rinnovata a mano
+ogni tre mesi** da un bottone sulla dashboard, altrimenti si spegne; e ne hai
+**una sola**, quindi se ci gira già un altro progetto i due devono dividersi lo
+stesso indirizzo per percorso.
+
+**A pagamento è più semplice, se un giorno vuoi:** PythonAnywhere Developer
+($10/mese — il vecchio Hacker da $5 non esiste più) dà una always-on task e
+internet senza restrizioni, e allora `python -m fantabot.bot.main` in polling
+basta e avanza, senza Actions e senza webhook.
 
 **Vercel non è la forma giusta**, e lo dicono i suoi stessi limiti: le funzioni
 durano al massimo 300 secondi (niente processo che resta acceso), il
