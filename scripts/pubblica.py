@@ -25,6 +25,7 @@ Variabili d'ambiente (i segreti del repository):
 from __future__ import annotations
 
 import os
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -58,7 +59,28 @@ def scarica_precedente(client: httpx.Client) -> bool:
         return False
     LOCALE.parent.mkdir(parents=True, exist_ok=True)
     LOCALE.write_bytes(risposta.content)
+    # QUELLO CHE TORNA E' UN FILE, NON PER FORZA UN DATABASE. Un download
+    # troncato, o qualunque altra cosa finita a quel percorso, farebbe morire
+    # il job — e morirebbe anche tutti quelli dopo, perche' ritroverebbero lo
+    # stesso file. Un pacco che non si apre si butta: ripartire da zero costa
+    # qualche minuto di scaricamento, restare bloccati costa la stagione.
+    if not _e_un_database(LOCALE):
+        print("· il pacco precedente non e' leggibile: lo ignoro e riparto da zero")
+        LOCALE.unlink()
+        return False
     print(f"· ripreso il pacco precedente, {len(risposta.content) // 1024} KB")
+    return True
+
+
+def _e_un_database(percorso: Path) -> bool:
+    try:
+        conn = sqlite3.connect(percorso)
+        try:
+            conn.execute("SELECT COUNT(*) FROM sqlite_master")
+        finally:
+            conn.close()
+    except sqlite3.DatabaseError:
+        return False
     return True
 
 
