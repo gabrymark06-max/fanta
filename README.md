@@ -639,6 +639,17 @@ viaggia affatto: si ricostruisce sul posto appena arrivano statistiche nuove,
 perché Actions riparte ogni volta da capo e la sua storia sarebbe lunga una
 riga sola.
 
+#### Il passaggio, se la web app la usava già un altro
+
+Non si spegne il vecchio per accendere il nuovo: si mette un file WSGI che
+prova prima il nuovo e, se non parte, lascia il posto al vecchio
+(`deploy/wsgi_pythonanywhere.py`). Finché le librerie nuove non ci sono,
+l'import fallisce e risponde ancora il progetto di prima; appena ci sono, al
+primo reload il passaggio avviene da solo. **In mezzo non c'è nessun istante in
+cui l'indirizzo è morto**, e il log della web app dice sempre quale dei due è
+partito — una scelta automatica che non dichiara la strada presa è il modo più
+rapido di perdere un'ora a chiedersi perché il bot non risponde.
+
 #### Cosa serve configurare
 
 Segreti del repository (`gh secret set`), tutti già impostabili senza toccare

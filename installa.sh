@@ -43,4 +43,23 @@ print(f"database: {n} giocatori")
 PY
 
 echo
-echo "== fatto. Ora dimmelo e ci penso io al resto."
+echo "== dico a Telegram dove bussare"
+PYTHONPATH=~/fanta/src python3.10 - <<'PY'
+import os
+
+from fantabot.bot.web import registra_webhook
+
+dominio = os.environ.get("PA_DOMINIO", "")
+if not dominio:
+    # Il nome della web app e' il nome utente: e' cosi' per tutti gli account
+    # gratuiti, e chiederlo sarebbe chiedere una cosa che si sa gia'.
+    dominio = f"{os.environ.get('USER', '')}.pythonanywhere.com"
+url = f"https://{dominio}/telegram/"
+esito = registra_webhook(url)
+print(url, "->", esito.get("description") or esito)
+PY
+
+echo
+echo "== fatto."
+echo "   Manca un clic solo: la scheda Web della dashboard, bottone verde"
+echo "   Reload. Da quel momento risponde il fantabot."
