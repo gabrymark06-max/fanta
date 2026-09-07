@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+dati/*.sqlite3
+dati/*.sqlite3-wal
+dati/*.sqlite3-shm
+dati/cache/
+.pytest_cache/
+.ruff_cache/
+
+# Listini e strategie personali importate: sono dati tuoi.
+*.xlsx
+*.xls
+
+# Output di build di setuptools.
+*.egg-info/
+build/
+dist/
