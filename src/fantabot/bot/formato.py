@@ -787,6 +787,23 @@ def esito_import(esito) -> str:
     return "\n".join(righe)
 
 
+def dati_da_fuori(quando: str) -> str:
+    """La risposta a /aggiorna dove le fonti le legge qualcun altro.
+
+    Non e' un errore e non deve sembrarlo: e' come funziona. Serve solo dire
+    di quando sono i dati — che e' la domanda vera dietro «aggiorna» — e ogni
+    quanto arrivano i prossimi.
+    """
+    return (
+        "<b>I dati arrivano da soli.</b>\n"
+        f"<code>ultimi ricevuti: {quando[:16] or 'mai'}</code>\n\n"
+        "<i>Da qui non riesco a leggere fantacalcio.it: chi mi ospita lascia "
+        "uscire solo verso Telegram. Le fonti le rilegge GitHub Actions ogni "
+        "sei ore e mi manda il risultato gia' pronto, quindi non c'e' niente "
+        "da lanciare a mano.</i>"
+    )
+
+
 def fuori_lista(righe: list, quanti_nel_listone: int = 0) -> str:
     """Chi il listone ha ancora e il file delle fasce no.
 

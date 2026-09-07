@@ -265,8 +265,22 @@ def riassunto_aggiornamento(esito: dict) -> str:
     return testo
 
 
+CHIAVE_LEGGE_DA_SOLO = "legge_da_solo"
+
+
 async def cmd_aggiorna(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Rilegge le fonti — o spiega perche' da qui non si puo'.
+
+    Dove il bot gira dietro un proxy che lascia uscire solo verso Telegram, le
+    fonti le legge qualcun altro e le manda gia' pronte. Provarci lo stesso
+    finirebbe in un timeout e in un messaggio d'errore che sembra un guasto,
+    mentre e' il funzionamento normale: meglio dire dove sono i dati e di
+    quando sono.
+    """
     srv = servizio(context)
+    if not context.application.bot_data.get(CHIAVE_LEGGE_DA_SOLO, True):
+        await _rispondi(update, formato.dati_da_fuori(srv.quando_sono_arrivati()))
+        return
     await _rispondi(update, "Rileggo listone, statistiche, campo e infermeria…")
     try:
         esito = await asyncio.to_thread(aggiorna_tutto, srv.conn)
@@ -1233,6 +1247,7 @@ def costruisci(
     app = Application.builder().token(cfg.token_telegram).build()
     servizio_ = Servizio(conn or connetti())
     app.bot_data[CHIAVE_SERVIZIO] = servizio_
+    app.bot_data[CHIAVE_LEGGE_DA_SOLO] = aggiorna_da_solo
     # Le matrici di abbinamento che il progetto porta con se', se non ne hai
     # gia' importata una tua.
     coppie.carica_semi(servizio_.conn)

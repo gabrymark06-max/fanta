@@ -505,6 +505,18 @@ class Servizio:
             for sigla, p in partite.items()
         }
 
+    def quando_sono_arrivati(self) -> str:
+        """L'ultima volta che il listone e' stato scritto, come la scrive SQLite.
+
+        Non e' "quando ho aggiornato": e' la data che porta con se' il dato
+        stesso, e va bene sia che l'aggiornamento l'abbia fatto il bot sia che
+        gliel'abbia spedito qualcun altro.
+        """
+        riga = self.conn.execute(
+            "SELECT MAX(aggiornato_il) FROM giocatori"
+        ).fetchone()
+        return (riga[0] if riga else "") or ""
+
     def conta_giocatori(self) -> int:
         return self.conn.execute("SELECT count(*) FROM giocatori").fetchone()[0]
 

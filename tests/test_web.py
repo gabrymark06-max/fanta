@@ -219,3 +219,22 @@ def test_affianca_non_confonde_un_prefisso_che_somiglia():
         app({"PATH_INFO": "/fantacalcio", "SCRIPT_NAME": ""}, lambda *a: None)
     )
     assert corpo == b"altra"
+
+
+# -- /aggiorna dove le fonti le legge qualcun altro -----------------------
+
+
+def test_aggiorna_spiega_invece_di_provarci():
+    """Da dietro il proxy, provarci finirebbe in un timeout che sembra un guasto."""
+    from fantabot.bot import formato
+
+    testo = formato.dati_da_fuori("2026-09-07 15:14:04")
+    assert "arrivano da soli" in testo
+    assert "2026-09-07 15:14" in testo
+    assert "GitHub Actions" in testo
+
+
+def test_aggiorna_senza_dati_lo_dice():
+    from fantabot.bot import formato
+
+    assert "mai" in formato.dati_da_fuori("")
