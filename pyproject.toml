@@ -2,12 +2,15 @@
 name = "fantabot"
 version = "0.1.0"
 description = "Assistente d'asta e di stagione per il fantacalcio Classic, su Telegram"
-requires-python = ">=3.11"
+requires-python = ">=3.10"
 dependencies = [
     "python-telegram-bot[job-queue]==21.9",
     "httpx>=0.27",
     "beautifulsoup4>=4.12",
     "lxml>=5.0",
+    # Serve a leggere il foglio delle fasce: senza, l'import di un .xlsx
+    # fallisce con un ImportError nel momento in cui lo carichi.
+    "openpyxl>=3.1",
 ]
 
 [project.optional-dependencies]
@@ -30,6 +33,9 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 95
 src = ["src"]
+# La web app su PythonAnywhere gira su Python 3.10: dichiararlo qui fa
+# segnalare a ruff la sintassi che li' non esisterebbe.
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

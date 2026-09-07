@@ -168,3 +168,54 @@ def test_assorbire_scatta_anche_la_fotografia(tmp_path, conn_popolato):
 
     assert ultima_giornata(vuoto) == 5
     vuoto.close()
+
+
+# -- convivere con un altro progetto sulla stessa web app -----------------
+
+
+def test_affianca_manda_il_resto_all_altra_app():
+    """Il progetto che c'era gia' non deve accorgersi di niente."""
+    import wsgi_fanta
+
+    visite = []
+
+    def altra(environ, start_response):
+        visite.append(environ["PATH_INFO"])
+        start_response("200 OK", [])
+        return [b"altra"]
+
+    def mia(environ, start_response):
+        visite.append(("mia", environ["PATH_INFO"], environ["SCRIPT_NAME"]))
+        start_response("200 OK", [])
+        return [b"mia"]
+
+    app = wsgi_fanta.affianca("/fanta", altra, mia)
+
+    def chiama(percorso):
+        return b"".join(app({"PATH_INFO": percorso, "SCRIPT_NAME": ""}, lambda *a: None))
+
+    assert chiama("/") == b"altra"
+    assert chiama("/webhook/qualcosa") == b"altra"
+    assert chiama("/fanta") == b"mia"
+    assert chiama("/fanta/telegram") == b"mia"
+    # Il prefisso viene tolto dal percorso e spostato in SCRIPT_NAME.
+    assert ("mia", "/telegram", "/fanta") in visite
+
+
+def test_affianca_non_confonde_un_prefisso_che_somiglia():
+    """`/fantacalcio` non deve finire nel fantabot solo perche' comincia uguale."""
+    import wsgi_fanta
+
+    def altra(environ, start_response):
+        start_response("200 OK", [])
+        return [b"altra"]
+
+    def mia(environ, start_response):
+        start_response("200 OK", [])
+        return [b"mia"]
+
+    app = wsgi_fanta.affianca("/fanta", altra, mia)
+    corpo = b"".join(
+        app({"PATH_INFO": "/fantacalcio", "SCRIPT_NAME": ""}, lambda *a: None)
+    )
+    assert corpo == b"altra"
