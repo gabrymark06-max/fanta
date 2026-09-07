@@ -63,6 +63,22 @@ MIE = (
     "andamento",
 )
 
+# Quelle per cui ZERO RIGHE VUOL DIRE CHE LA LETTURA E' ANDATA MALE, non che
+# non c'e' niente da dire. Un listone vuoto e' fantacalcio.it che ha risposto
+# 503, mai il campionato senza giocatori: si tiene quello di prima.
+#
+# LE ALTRE DEVONO POTER TORNARE VUOTE, e la distinzione non e' teorica. Gli
+# squalificati sono nessuno per gran parte della stagione: trattare quel vuoto
+# come un guasto vorrebbe dire non cancellare mai una squalifica scontata, e
+# tenere un giocatore in panchina per sempre. La prima versione di questo file
+# faceva esattamente questo.
+MAI_VUOTE = ("giocatori", "statistiche", "calendario", "coppie", "campo")
+
+# Chi punta a `giocatori`. Quando il listone cambia, le righe che parlano di
+# un giocatore che non c'e' piu' non sono un problema da aggirare: sono
+# informazioni su qualcuno che non gioca piu' in Serie A, e si buttano.
+FIGLIE_DI_GIOCATORI = ("campo", "infortuni", "squalifiche")
+
 
 @dataclass
 class Esito:
@@ -146,6 +162,14 @@ def assorbi(conn: sqlite3.Connection, sorgente: Path | str) -> Esito:
             )
         }
         qui = tabelle_dello_schema(conn)
+        # LE CHIAVI ESTERNE SI CONTROLLANO ALLA FINE, non riga per riga.
+        # `campo`, `infortuni` e `squalifiche` puntano a `giocatori`: appena si
+        # svuota il listone per rimetterlo nuovo, quelle righe restano appese
+        # per un istante e SQLite rifiuta tutto — il sync non sarebbe mai
+        # riuscito una volta sola su un database in uso. Si spengono qui, si
+        # ripuliscono gli orfani, e si riaccendono per il controllo finale:
+        # la coerenza si pretende dove deve esserci, cioe' alla fine.
+        conn.execute("PRAGMA foreign_keys = OFF")
         conn.execute("BEGIN IMMEDIATE")
         for tabella in DI_RIFERIMENTO:
             if tabella not in arrivate or tabella not in qui:
@@ -153,19 +177,36 @@ def assorbi(conn: sqlite3.Connection, sorgente: Path | str) -> Esito:
             quante = conn.execute(
                 f"SELECT COUNT(*) FROM nuovo.{tabella}"
             ).fetchone()[0]
-            if not quante:
-                # Una tabella arrivata vuota non e' un aggiornamento: e' una
-                # lettura andata male dall'altra parte. Si tiene quella che
-                # c'era, che almeno e' vera.
+            if not quante and tabella in MAI_VUOTE:
                 log.warning("%s arriva vuota: tengo quella di prima", tabella)
                 continue
             conn.execute(f"DELETE FROM {tabella}")
             conn.execute(f"INSERT INTO {tabella} SELECT * FROM nuovo.{tabella}")
             conte[tabella] = quante
+
+        if "giocatori" in conte:
+            for figlia in FIGLIE_DI_GIOCATORI:
+                if figlia in qui:
+                    conn.execute(
+                        f"DELETE FROM {figlia} WHERE id_fc NOT IN"
+                        " (SELECT id_fc FROM giocatori)"
+                    )
+
+        orfane = conn.execute("PRAGMA foreign_key_check").fetchall()
+        if orfane:
+            conn.execute("ROLLBACK")
+            return Esito(
+                tabelle={},
+                errore=(
+                    f"{len(orfane)} righe resterebbero appese a giocatori che "
+                    "non esistono: non ho assorbito niente"
+                ),
+            )
         conn.execute("COMMIT")
     except sqlite3.Error as e:
         conn.execute("ROLLBACK")
         return Esito(tabelle={}, errore=f"non ho assorbito niente: {e}")
     finally:
+        conn.execute("PRAGMA foreign_keys = ON")
         conn.execute("DETACH DATABASE nuovo")
     return Esito(tabelle=conte)

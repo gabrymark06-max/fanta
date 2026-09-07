@@ -141,3 +141,84 @@ def test_andata_e_ritorno_conserva_i_numeri(conn_popolato, tmp_path):
                 == quante
             )
     vuoto.close()
+
+
+def test_una_squalifica_scontata_sparisce(conn_popolato, tmp_path):
+    """Il vuoto degli squalificati e' uno stato, non un guasto.
+
+    Per gran parte della stagione non e' squalificato nessuno. Se quel vuoto
+    valesse come lettura fallita, una squalifica scontata non verrebbe mai
+    cancellata e il bot terrebbe quel giocatore in panchina per sempre.
+    """
+    conn_popolato.execute(
+        "INSERT INTO squalifiche (id_fc, giornate) VALUES (1, 2)"
+    )
+    conn_popolato.commit()
+
+    mondo = connetti(tmp_path / "mondo.sqlite3")
+    mondo.execute(
+        "INSERT INTO giocatori (id_fc, nome, nome_cerca, squadra, ruolo, fvm)"
+        " VALUES (1, 'Tizio', 'tizio', 'ATA', 'a', 10)"
+    )
+    mondo.commit()
+    pacco = tmp_path / "riferimento.sqlite3"
+    sincronizza.esporta(mondo, pacco)
+    mondo.close()
+
+    assert sincronizza.assorbi(conn_popolato, pacco).riuscito
+    assert conn_popolato.execute(
+        "SELECT COUNT(*) FROM squalifiche"
+    ).fetchone()[0] == 0
+
+
+def test_le_tabelle_che_non_possono_essere_vuote_sono_di_riferimento():
+    assert set(sincronizza.MAI_VUOTE) <= set(sincronizza.DI_RIFERIMENTO)
+
+
+def test_il_listone_si_sostituisce_anche_con_minuti_e_infortuni_dentro(
+    conn_popolato, tmp_path
+):
+    """Il caso normale sul bot vero, e quello che rompeva tutto.
+
+    `campo`, `infortuni` e `squalifiche` puntano a `giocatori`. Svuotare il
+    listone per rimetterlo nuovo lasciava quelle righe appese per un istante,
+    e SQLite rifiutava l'intera transazione: il sync non sarebbe mai riuscito
+    una volta sola, su un database in uso.
+    """
+    conn_popolato.executemany(
+        "INSERT INTO campo (id_fc, minuti, presenze, giornate_squadra)"
+        " VALUES (?, 270, 3, 3)",
+        [(1,), (2,), (3,)],
+    )
+    conn_popolato.execute(
+        "INSERT INTO infortuni (id_fc, testo, giornate_fuori)"
+        " VALUES (2, 'lesione', 4)"
+    )
+    conn_popolato.execute("INSERT INTO squalifiche (id_fc, giornate) VALUES (3, 1)")
+    conn_popolato.commit()
+
+    mondo = connetti(tmp_path / "mondo.sqlite3")
+    mondo.executemany(
+        "INSERT INTO giocatori (id_fc, nome, nome_cerca, squadra, ruolo, fvm)"
+        " VALUES (?, ?, ?, 'ATA', 'a', 10)",
+        [(500, "Nuovo", "nuovo"), (501, "Altro", "altro")],
+    )
+    mondo.execute(
+        "INSERT INTO campo (id_fc, minuti, presenze, giornate_squadra)"
+        " VALUES (500, 90, 1, 1)"
+    )
+    mondo.commit()
+    pacco = tmp_path / "riferimento.sqlite3"
+    sincronizza.esporta(mondo, pacco)
+    mondo.close()
+
+    esito = sincronizza.assorbi(conn_popolato, pacco)
+    assert esito.riuscito, esito.errore
+    assert sorted(
+        r[0] for r in conn_popolato.execute("SELECT id_fc FROM giocatori")
+    ) == [500, 501]
+    assert [r[0] for r in conn_popolato.execute("SELECT id_fc FROM campo")] == [500]
+    # Niente righe orfane: chi non e' piu' in listone non e' piu' fermo.
+    assert conn_popolato.execute(
+        "SELECT COUNT(*) FROM infortuni"
+    ).fetchone()[0] == 0
