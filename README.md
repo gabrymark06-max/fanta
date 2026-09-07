@@ -576,6 +576,34 @@ si rompe sai subito se è colpa del sito o tua.
 
 ---
 
+## Metterlo online (o non metterlo)
+
+Il bot **fa polling**: un processo che resta acceso e chiede a Telegram se c'è
+posta, più un lavoro ogni sei ore che rilegge le fonti. Da questo discende
+tutto il resto, e la forma sbagliata di hosting non è più lenta — è impossibile.
+
+**La sera dell'asta: il portatile.** `python -m fantabot.bot.main`, e basta. Non
+è un ripiego: è il modo per cui il database è SQLite invece di Postgres. Zero
+costo, internet pieno, e nessun deploy da fare nell'ora in cui serve.
+
+**Per la stagione, se lo vuoi acceso senza il PC: PythonAnywhere a pagamento**
+(piano Developer, $10/mese — il vecchio Hacker da $5 non esiste più). Dà **una
+always-on task** e **internet senza restrizioni**, che sono esattamente le due
+cose che servono. Non c'è una riga da cambiare: `git pull`, `.env`, e la task
+lancia `python -m fantabot.bot.main`.
+
+**PythonAnywhere gratis non basta**, e non per poco: gli account gratuiti
+raggiungono solo i siti di una whitelist. `api.telegram.org` c'è —
+fantacalcio.it, fotmob e sportsgambler **no**. Il bot risponderebbe ai comandi
+e non saprebbe niente: né listone, né minuti, né infortuni, né squalifiche.
+
+**Vercel non è la forma giusta**, e lo dicono i suoi stessi limiti: le funzioni
+durano al massimo 300 secondi (niente processo che resta acceso), il
+filesystem non è scrivibile (niente SQLite), e i cron del piano Hobby girano
+**una volta al giorno** invece che ogni sei ore. Ci si può arrivare — webhook al
+posto del polling, Postgres al posto di SQLite — ma è riscrivere persistenza,
+avvio e schedulazione per ottenere qualcosa di peggio.
+
 ## Limiti noti
 
 - **Solo Classic.** I ruoli Mantra vengono letti e salvati, ma il motore
