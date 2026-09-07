@@ -659,10 +659,22 @@ from fantabot.bot.web import registra_webhook
 registra_webhook("https://utente.pythonanywhere.com/telegram/")
 ```
 
-**Due cose da sapere del piano gratuito**: la web app va **rinnovata a mano
-ogni tre mesi** da un bottone sulla dashboard, altrimenti si spegne; e ne hai
-**una sola**, quindi se ci gira già un altro progetto i due devono dividersi lo
-stesso indirizzo per percorso.
+**Tre cose da sapere del piano gratuito.** La web app va **rinnovata a mano ogni
+tre mesi** da un bottone sulla dashboard, altrimenti si spegne. Ne hai **una
+sola**: se ci gira già un altro progetto, `affianca()` in `wsgi_fanta.py` monta
+il fantabot sotto un prefisso e lascia tutto il resto all'app che c'era — che
+non va toccata, né un import né una rotta.
+
+E la terza, che è quella che morde: **i pacchetti sono condivisi**. Due
+progetti sulla stessa web app girano nello stesso interprete e leggono lo
+stesso `~/.local/lib/pythonX.Y/site-packages`, quindi non possono usare due
+versioni maggiori diverse della stessa libreria. Questo bot vuole
+`python-telegram-bot` 21.x; un progetto che ne usa la 13 fa `from telegram
+import ParseMode`, che nella 21 non esiste più, e l'aggiornamento lo spegne
+all'import. Prima di affiancare due bot, **guarda cosa importano tutti e due**:
+se uno dei due parla con Telegram via HTTP grezzo (`requests`, `httpx`) non c'è
+nessun conflitto, se usa PTB a una versione diversa non c'è nessuna
+convivenza.
 
 **A pagamento è più semplice, se un giorno vuoi:** PythonAnywhere Developer
 ($10/mese — il vecchio Hacker da $5 non esiste più) dà una always-on task e
