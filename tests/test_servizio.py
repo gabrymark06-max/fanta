@@ -94,7 +94,43 @@ def test_le_valutazioni_si_ricalcolano_quando_cambiano_le_regole(srv, lega):
 
 
 def test_rinomina_gli_avversari_lasciando_stare_la_mia(srv, lega):
-    assert srv.rinomina_squadre(lega, ["Marco", "Luca"]) == 2
+    esito = srv.rinomina_squadre(lega, ["Marco", "Luca"])
+    assert esito.assegnati == ["Marco", "Luca"]
     nomi = [s.nome for s in srv.squadre(lega)]
     assert nomi[0] == "La mia squadra"
     assert "Marco" in nomi and "Luca" in nomi
+
+
+def test_dice_quanti_avversari_restano_senza_nome(srv, lega):
+    """Sette avversari e due nomi: cinque restano com'erano, e va detto."""
+    esito = srv.rinomina_squadre(lega, ["Marco", "Luca"])
+    assert esito.senza_nome == 5
+    assert esito.avanzati == []
+
+
+def test_un_nome_di_troppo_non_sparisce_in_silenzio(srv, lega):
+    """Il caso vero: otto nomi per una lega da otto, ma una squadra e' la tua.
+
+    La prima versione ne applicava sette e buttava l'ottavo senza una parola.
+    Un nome scartato in silenzio la sera dell'asta diventa una rosa attribuita
+    alla squadra sbagliata.
+    """
+    esito = srv.rinomina_squadre(lega, list("abcdefgh"))
+    assert len(esito.assegnati) == 7
+    assert esito.avanzati == ["h"]
+    assert esito.senza_nome == 0
+
+
+def test_la_mia_squadra_si_puo_chiamare_come_vuoi(srv, lega):
+    prima = srv.rinomina_mia(lega, "CarmySpecial")
+    assert prima == "La mia squadra"
+    mia = next(s for s in srv.squadre(lega) if s.e_mia)
+    assert mia.nome == "CarmySpecial"
+
+
+def test_rinominare_la_mia_non_tocca_gli_avversari(srv, lega):
+    srv.rinomina_squadre(lega, ["Marco", "Luca"])
+    srv.rinomina_mia(lega, "CarmySpecial")
+    nomi = sorted(s.nome for s in srv.squadre(lega) if not s.e_mia)
+    assert "Marco" in nomi and "Luca" in nomi
+    assert "CarmySpecial" not in nomi

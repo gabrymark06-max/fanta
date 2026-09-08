@@ -215,9 +215,24 @@ async def cmd_squadre(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
             "<i>Per rinominarle: /squadre Marco, Luca, Giulia</i>",
         )
         return
+    # "/squadre mia CarmySpecial": la tua, non gli avversari. Sta qui e non in
+    # un comando a parte perche' e' la stessa domanda — come si chiamano le
+    # squadre — e all'asta un comando in meno da ricordare vale piu' di una
+    # separazione elegante.
+    pezzi = testo.split(maxsplit=1)
+    if len(pezzi) == 2 and pezzi[0].lower() in ("mia", "io", "mio"):
+        prima = srv.rinomina_mia(lega, pezzi[1])
+        await _rispondi(
+            update,
+            f"La tua squadra adesso si chiama <b>{pezzi[1].strip()}</b>"
+            + (f" <i>(era «{prima}»)</i>." if prima else "."),
+        )
+        return
+
     nomi = [n.strip() for n in testo.split(",") if n.strip()]
-    cambiati = srv.rinomina_squadre(lega, nomi)
-    await _rispondi(update, f"Rinominate {cambiati} squadre.")
+    esito = srv.rinomina_squadre(lega, nomi)
+    mia = next((s.nome for s in srv.squadre(lega) if s.e_mia), "")
+    await _rispondi(update, formato.squadre_rinominate(esito, mia))
 
 
 async def cmd_prudenza(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

@@ -462,3 +462,29 @@ def test_un_giocatore_senza_ruolo_non_fa_esplodere_niente(srv):
     mia = srv.squadre(lega)[0]
     assert "senza un ruolo assegnato" in srv.registra(lega, 8001, mia.id, 5)
     assert not srv.squadre(lega)[0].acquisti
+
+
+def test_messaggio_di_rinomina_spiega_il_nome_avanzato():
+    """«Rinominate 7 squadre» su otto nomi sembra un errore di conteggio."""
+    from fantabot.bot import formato
+    from fantabot.servizio import Rinomina
+
+    testo = formato.squadre_rinominate(
+        Rinomina(assegnati=list("abcdefg"), avanzati=["h"], senza_nome=0),
+        nome_mia="La mia squadra",
+    )
+    assert "Rinominati 7 avversari" in testo
+    assert "Non ho usato: h" in testo
+    assert "l'ultima squadra della lega e' la tua" in testo
+    assert "/squadre mia h" in testo
+
+
+def test_messaggio_di_rinomina_dice_chi_resta_senza_nome():
+    from fantabot.bot import formato
+    from fantabot.servizio import Rinomina
+
+    testo = formato.squadre_rinominate(
+        Rinomina(assegnati=["Marco", "Luca"], avanzati=[], senza_nome=5)
+    )
+    assert "5 avversari sono rimasti col nome di prima" in testo
+    assert "Non ho usato" not in testo

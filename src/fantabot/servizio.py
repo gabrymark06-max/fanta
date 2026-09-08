@@ -47,6 +47,18 @@ class Lega:
     prima_giornata: int = 1
 
 
+@dataclass(frozen=True)
+class Rinomina:
+    """Cosa e' stato assegnato, cosa e' avanzato, cosa e' rimasto scoperto."""
+
+    assegnati: list[str]
+    avanzati: list[str]
+    senza_nome: int
+
+    def __len__(self) -> int:
+        return len(self.assegnati)
+
+
 class Servizio:
     def __init__(self, conn: sqlite3.Connection) -> None:
         self.conn = conn
@@ -155,21 +167,46 @@ class Servizio:
         self._valutazioni.clear()
         return lega
 
-    def rinomina_squadre(self, lega: Lega, nomi: list[str]) -> int:
-        """Sostituisce i nomi degli avversari, nell'ordine dato."""
+    def rinomina_squadre(self, lega: Lega, nomi: list[str]) -> Rinomina:
+        """Sostituisce i nomi degli avversari, nell'ordine dato.
+
+        DICE SEMPRE COSA E' AVANZATO. In una lega da otto squadre gli
+        avversari sono sette, perche' l'ottava sei tu: chi scrive otto nomi ne
+        vede applicati sette, e la prima versione buttava l'ottavo senza una
+        parola. Un nome scartato in silenzio la sera dell'asta diventa una
+        rosa attribuita alla squadra sbagliata.
+        """
         avversari = self.conn.execute(
-            "SELECT id FROM squadre WHERE id_lega = ? AND e_mia = 0 ORDER BY id",
+            "SELECT id, nome FROM squadre WHERE id_lega = ? AND e_mia = 0"
+            " ORDER BY id",
             (lega.id,),
         ).fetchall()
-        cambiati = 0
-        with transazione(self.conn):
+        puliti = [n.strip() for n in nomi if n.strip()]
+        assegnati: list[str] = []
+        with transazione(self.conn) as c:
             # Meno nomi che avversari e' legittimo: rinomina quelli dati.
-            for r, nome in zip(avversari, nomi, strict=False):
-                self.conn.execute(
-                    "UPDATE squadre SET nome = ? WHERE id = ?", (nome.strip(), r["id"])
-                )
-                cambiati += 1
-        return cambiati
+            for r, nome in zip(avversari, puliti, strict=False):
+                c.execute("UPDATE squadre SET nome = ? WHERE id = ?", (nome, r["id"]))
+                assegnati.append(nome)
+        return Rinomina(
+            assegnati=assegnati,
+            avanzati=puliti[len(avversari) :],
+            senza_nome=max(0, len(avversari) - len(puliti)),
+        )
+
+    def rinomina_mia(self, lega: Lega, nome: str) -> str:
+        """Da' un nome alla tua squadra. Restituisce quello che aveva prima."""
+        riga = self.conn.execute(
+            "SELECT id, nome FROM squadre WHERE id_lega = ? AND e_mia = 1",
+            (lega.id,),
+        ).fetchone()
+        if riga is None:
+            return ""
+        with transazione(self.conn) as c:
+            c.execute(
+                "UPDATE squadre SET nome = ? WHERE id = ?", (nome.strip(), riga["id"])
+            )
+        return riga["nome"]
 
     def imposta_prudenza(self, lega: Lega, prudenza: float) -> None:
         with transazione(self.conn):

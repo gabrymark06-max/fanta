@@ -788,6 +788,35 @@ def esito_import(esito) -> str:
     return "\n".join(righe)
 
 
+def squadre_rinominate(esito, nome_mia: str = "") -> str:
+    """Chi ha preso quale nome, e cosa e' rimasto fuori.
+
+    «Rinominate 7 squadre» su otto nomi dati e' un numero che non spiega
+    niente: sembra un errore di conteggio ed e' invece la squadra tua, che nel
+    conto c'e' ma fra gli avversari no. Qui si dice a chi sono andati i nomi e
+    cosa e' avanzato, cosi' il numero non ha bisogno di essere interpretato.
+    """
+    righe = [f"<b>Rinominati {len(esito.assegnati)} avversari</b>"]
+    if esito.assegnati:
+        righe.append("<code>" + " · ".join(esito.assegnati) + "</code>")
+    if esito.senza_nome:
+        righe.append(
+            f"\n<i>{esito.senza_nome} avversari sono rimasti col nome di prima: "
+            "aggiungi gli altri nomi quando li sai.</i>"
+        )
+    if esito.avanzati:
+        avanzati = ", ".join(esito.avanzati)
+        righe.append(
+            f"\n<b>Non ho usato: {avanzati}</b>\n"
+            f"<i>Gli avversari sono {len(esito.assegnati)}, non uno di piu': "
+            "l'ultima squadra della lega e' la tua"
+            + (f", che si chiama «{nome_mia}»." if nome_mia else ".")
+            + "</i>\n<i>Se quel nome era per te: "
+            f"<code>/squadre mia {esito.avanzati[0]}</code></i>"
+        )
+    return "\n".join(righe)
+
+
 def conferma_azzera(perso: dict, nome_lega: str = "") -> str:
     """Cosa sparisce, prima di far sparire qualcosa.
 
