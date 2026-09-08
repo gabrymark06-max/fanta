@@ -101,7 +101,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     srv = servizio(context)
     quanti = srv.conta_giocatori()
-    testo = formato.aiuto()
+    completo = any(
+        a.lower() in ("tutto", "tutti", "completo") for a in (context.args or [])
+    )
+    testo = formato.aiuto(completo)
     if quanti == 0:
         testo += "\n<b>Il listone e' vuoto: lancia /aggiorna prima di cominciare.</b>"
     else:
@@ -680,17 +683,26 @@ async def cmd_chiama(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     lega = await _lega_o_avviso(update, context)
     if lega is None:
         return
-    stato = servizio(context).stato(lega)
-    scelte = stato.da_chiamare(limite=6)
+    srv = servizio(context)
+    stato = srv.stato(lega)
+
+    # IL REPARTO AVANZA DA SOLO. Si passa ai difensori quando tutti hanno
+    # finito i portieri, non quando ho finito io: finche' un avversario ha uno
+    # slot scoperto, li' ci sono ancora crediti che si muovono. Tenerne il
+    # conto a mano e' esattamente quello che si sbaglia a reparto quasi
+    # chiuso, cioe' quando ogni giro saltato vale un giocatore alla base.
+    reparto = lega.reparto or None
+    chiuso = ""
+    if reparto:
+        aperto = stato.reparto_aperto(da=reparto)
+        if aperto != reparto:
+            chiuso, reparto = reparto, aperto
+            srv.imposta_reparto(lega, reparto or "")
+
+    scelte = stato.da_chiamare(limite=5, reparto=reparto)
+    esche = stato.esche(limite=3, reparto=reparto)
     await _rispondi(
-        update,
-        formato.consigli(
-            "Chiamali adesso",
-            scelte,
-            "Sono i giocatori che ti convengono e che pochi possono contenderti "
-            "in questo momento. Chiamare e' una mossa: il momento giusto e' "
-            "quando chi li vuole ha gia' speso.",
-        ),
+        update, formato.chiamata(reparto, scelte, esche, stato, chiuso)
     )
 
 

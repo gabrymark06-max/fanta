@@ -51,6 +51,12 @@ ACQUISTI_PER_STIMARE_LA_CURVA = 10
 PENDENZA_MINIMA = 0.75
 PENDENZA_MASSIMA = 1.60
 
+# Quando un'esca e' un'esca. Sotto i cinque crediti non drena niente e il giro
+# lo hai speso per niente; e con un solo rivale interessato non c'e' rilancio,
+# c'e' un regalo — quello lo prende alla base e ringrazia.
+ESCA_PREZZO_MINIMO = 5.0
+ESCA_RIVALI_MINIMI = 2
+
 
 @dataclass(frozen=True)
 class Acquisto:
@@ -81,6 +87,33 @@ class Rivale:
 
     squadra: Squadra
     massimo: int
+
+
+@dataclass(frozen=True)
+class Esca:
+    """Un giocatore da chiamare per far spendere gli altri, non per prenderlo.
+
+    `drenati` e' quanto uscira' dalle tasche di chi se lo prende. `rischio` e'
+    quanto costa a te se nessuno rilancia — che e' il prezzo base, uno, e va
+    detto sempre: un'esca e' una scommessa piccola, ma e' una scommessa.
+    """
+
+    valutazione: Valutazione
+    prezzo_corrente: float
+    drenati: int
+    rivali: tuple[Rivale, ...]
+    slot_libero: bool
+
+    @property
+    def nome(self) -> str:
+        return self.valutazione.giocatore.nome
+
+    @property
+    def rischio(self) -> str:
+        """Cosa succede se non rilancia nessuno."""
+        if self.slot_libero:
+            return "se nessuno rilancia te lo prendi a 1: hai lo slot libero"
+        return "hai il reparto pieno: se nessuno rilancia non puoi prenderlo"
 
 
 @dataclass(frozen=True)
@@ -717,6 +750,74 @@ class StatoAsta:
             candidati.append((vantaggio, c))
         candidati.sort(key=lambda t: -t[0])
         return [c for _, c in candidati[:limite]]
+
+    def reparto_aperto(self, da: str | None = None) -> str | None:
+        """Il primo ruolo che qualcuno in lega deve ancora riempire.
+
+        In un'asta che va a reparti si comincia dai portieri e si passa ai
+        difensori quando **tutti** hanno finito i portieri, non quando ho
+        finito io: finche' un solo avversario ha uno slot scoperto, quel
+        reparto e' ancora in ballo e ci sono ancora crediti che si muovono li'.
+
+        `da` dice da dove guardare: serve a non tornare indietro. Un reparto
+        gia' chiuso non si riapre perche' qualcuno ha annullato un acquisto.
+        """
+        ordine = list(RUOLI)
+        inizio = ordine.index(da) if da in ordine else 0
+        for ruolo in ordine[inizio:]:
+            if any(self.slot_mancanti(s).get(ruolo, 0) > 0 for s in self.squadre):
+                return ruolo
+        return None
+
+    def esche(self, limite: int = 3, reparto: str | None = None) -> list[Esca]:
+        """Chi chiamare per far spendere gli altri, quando non conviene comprare.
+
+        E' la mossa che distingue un'asta giocata da un'asta subita. Quando
+        tocca a te e i tuoi obiettivi costano troppo perche' gli avversari
+        sono ancora pieni di crediti, la cosa peggiore e' chiamare quello che
+        vuoi: lo paghi al massimo. La cosa migliore e' chiamare **quello che
+        vogliono loro** — il mercato lo paga piu' di quanto vale, i crediti
+        escono dalle loro tasche, e il tuo obiettivo fra due giri costa meno.
+        """
+        mia = self.mia
+        if mia is None:
+            return []
+        mancanti = self.slot_mancanti(mia)
+        prezzi = self.prezzi_correnti()
+        trovate: list[Esca] = []
+        for v in self.disponibili():
+            ruolo = v.giocatore.ruolo
+            if reparto and ruolo != reparto:
+                continue
+            # Non si usa come esca un giocatore che vuoi: il rischio e' che
+            # nessuno rilanci e te lo porti a casa — con quello sarebbe un
+            # regalo, non un rischio.
+            if self.preferenze.get(v.giocatore.id_fc, 0) > 0:
+                continue
+            prezzo = prezzi.get(v.giocatore.id_fc, v.prezzo_mercato)
+            if prezzo < ESCA_PREZZO_MINIMO:
+                continue
+            # DEVE COSTARE PIU' DI QUANTO VALE. Se e' un affare anche per te,
+            # chiamarlo per farlo comprare a un altro e' regalargli un affare.
+            if v.valore >= prezzo:
+                continue
+            rivali = [r for r in self.rivali(v.giocatore.id_fc) if r.massimo >= prezzo]
+            if len(rivali) < ESCA_RIVALI_MINIMI:
+                continue
+            # Quanto esce dalle loro tasche: in un rilancio si paga il secondo
+            # offerente piu' uno, quindi il conto lo fa il secondo, non il primo.
+            drenati = min(rivali[1].massimo + 1, int(rivali[0].massimo))
+            trovate.append(
+                Esca(
+                    valutazione=v,
+                    prezzo_corrente=prezzo,
+                    drenati=drenati,
+                    rivali=tuple(rivali),
+                    slot_libero=mancanti.get(ruolo, 0) > 0,
+                )
+            )
+        trovate.sort(key=lambda e: -e.drenati)
+        return trovate[:limite]
 
     def riepilogo(self, squadra: Squadra) -> dict[str, float]:
         """Come e' andata: spesa, valore comprato, e quanto sopra il rimpiazzo.

@@ -694,49 +694,67 @@ def piano_testo(stato: StatoAsta, preferenze: dict[int, int]) -> str:
     return "\n".join(righe)
 
 
-def aiuto() -> str:
-    return (
+def aiuto(completo: bool = False) -> str:
+    """Cosa serve adesso, non tutto quello che il bot sa fare.
+
+    TRENTA COMANDI NON SONO TRENTA POSSIBILITA': sono trenta cose da
+    ricordare mentre il banditore aspetta, e il risultato e' che non se ne usa
+    nessuna. Qui in cima ce ne sono tre — chiamare, chiedere una cifra,
+    registrare — perche' sono quelle che si usano ogni trenta secondi. Il
+    resto esiste ancora e sta sotto `/aiuto tutto`, dove lo si legge con
+    calma il giorno prima.
+    """
+    breve = (
         "<b>Fantabot</b> — assistente d'asta\n\n"
-        "<b>Durante l'asta</b>\n"
-        "<code>vlahovic</code> — la scheda e la cifra che dovrebbe bastare\n"
-        "<code>+vlahovic 25</code> — l'ho preso io a 25\n"
-        "<code>vlahovic 25 marco</code> — l'ha preso Marco: un messaggio, zero tap\n"
-        "<code>vlahovic 25</code> — l'ha preso un altro, ti chiedo chi\n\n"
-        "<b>Per decidere</b>\n"
-        "/chiama — chi conviene chiamare adesso, e perche'\n"
+        "<b>Ti bastano queste tre.</b>\n\n"
+        "<code>/chiama</code>\n"
+        "<i>Cosa chiamare adesso: il reparto in ballo, chi ti conviene, e "
+        "se non conviene nessuno, l'esca per far spendere gli altri.</i>\n\n"
+        "<code>vlahovic</code>\n"
+        "<i>La scheda e fino a quanto offrire. Basta il nome, anche storpiato.</i>\n\n"
+        "<code>+vlahovic 25</code>\n"
+        "<i>L'ho preso io a 25. Se lo prende un altro: "
+        "<code>vlahovic 25 marco</code>.</i>\n\n"
+        "<b>Se sbagli</b>  /annulla  ·  /correggi <code>vlahovic 32</code>\n"
+    )
+    if not completo:
+        return breve + "\n<i>Tutti gli altri comandi: /aiuto tutto</i>"
+
+    return (
+        breve
+        + "\n<b>Mentre l'asta corre</b>\n"
+        "/rosa — la tua rosa (o /rosa <code>marco</code>)\n"
         "/budget — quanto spendere per reparto\n"
+        "/mercato — crediti e slot di tutti, inflazione\n"
+        "/liberi <code>d</code> — i migliori difensori ancora liberi\n"
         "/occasioni — chi rende piu' di quanto costa\n"
-        "/campo — chi sta giocando davvero, e chi no\n"
+        "/turno — a chi tocca chiamare\n"
+        "/reparto <code>p</code> — apri i portieri (<code>libero</code> per togliere)\n"
+        "/coppie — come abbinare portieri e attaccanti\n"
+        "/riepilogo — quanto valore hai comprato, e a che prezzo\n"
+        "/piano — il foglio d'asta da stampare\n"
+        "\n<b>La tua lista</b>\n"
+        "/target <code>vlahovic</code> — obiettivo: offro di piu'\n"
+        "/evita <code>vlahovic</code> — offro di meno\n"
+        "/lista — i tuoi obiettivi, chi e' libero e a quanto\n"
+        "\n<b>Durante la stagione</b>\n"
+        "/formazione — chi schierare, e con che modulo\n"
+        "/giornata — il calendario, con dentro i tuoi\n"
+        "/campo — chi sta giocando davvero\n"
         "/infortunati — chi e' fermo e per quanto\n"
         "/squalificati — chi salta la prossima, e i diffidati\n"
-        "/turno — a chi tocca chiamare, e cosa chiamare\n"
-        "/reparto p — apri il reparto portieri, se chiamate a ruolo\n"
-        "\n<b>Durante la stagione</b>\n"
-        "/formazione — chi schierare domenica, e con che modulo\n"
-        "/giornata — il calendario, con dentro i tuoi\n"
+        "/andamento <code>malen</code> — bonus e malus giornata per giornata\n"
         "/scambi — gli scambi che convengono anche all'altro\n"
-        "/scambio malen marco — registra un passaggio di proprieta'\n"
-        "/andamento malen — bonus e malus giornata per giornata\n"
-        "/liberi <code>d</code> — i migliori difensori ancora liberi\n"
-        "/mercato — crediti e slot di tutti, inflazione\n"
-        "/rosa — la tua rosa (o /rosa <code>nome</code>)\n"
-        "/riepilogo — quanto valore hai comprato, e a che prezzo\n\n"
-        "<b>La tua lista</b>\n"
-        "/target <code>vlahovic</code> — obiettivo: offro di piu' per averlo\n"
-        "/evita <code>vlahovic</code> — offro di meno\n"
-        "/lista — i tuoi obiettivi, chi e' ancora libero e a quanto\n\n"
-        "<b>Se sbagli</b>\n"
-        "/annulla — cancella l'ultima assegnazione\n"
-        "/annulla <code>vlahovic</code> — cancella quella, anche se non e' l'ultima\n"
-        "/correggi <code>vlahovic 32</code> — cambia solo il prezzo\n"
-        "/azzera — cancella le rose e ricomincia (chiede conferma)\n\n"
-        "<b>Configurazione</b>\n"
+        "/scambio <code>malen marco</code> — registra un passaggio\n"
+        "\n<b>Configurazione</b>\n"
         "/setup <code>500 8 3-8-8-6</code> — crediti, squadre, slot\n"
-        "/squadre <code>Marco, Luca, ...</code> — nomi degli avversari\n"
+        "/squadre <code>Marco, Luca...</code> — nomi degli avversari\n"
+        "/squadre mia <code>CarmySpecial</code> — il nome della tua\n"
         "/prudenza <code>1.2</code> — piu' alto = offerte piu' caute\n"
-        "/aggiorna — riscarica listone e statistiche\n"
         "/importa — come mandarmi il foglio delle fasce\n"
         "/fuorilista — chi ho smesso di nominare, e perche'\n"
+        "/aggiorna — rileggi le fonti\n"
+        "/azzera — cancella le rose e ricomincia\n"
     )
 
 
@@ -785,6 +803,79 @@ def esito_import(esito) -> str:
             + ("…" if len(esito.non_trovati) > 8 else "")
             + "</i>\nControlla che sia lo stesso listone: /aggiorna lo riallinea."
         )
+    return "\n".join(righe)
+
+
+def chiamata(
+    reparto: str | None,
+    scelte: list,
+    esche: list,
+    stato: StatoAsta,
+    chiuso: str = "",
+) -> str:
+    """Il messaggio che leggi quando tocca a te chiamare.
+
+    UNO SOLO, e in ordine di decisione. Prima cosa si sta chiamando — il
+    reparto — poi chi prendere, poi, se prendere non conviene, chi chiamare
+    per far spendere gli altri. Tre schermate separate obbligavano a
+    ricomporre la situazione in testa mentre il banditore aspetta, ed e'
+    esattamente quello che all'asta non si ha tempo di fare.
+    """
+    mia = stato.mia
+    righe: list[str] = []
+    if chiuso:
+        righe.append(
+            f"<b>Reparto {PLURALE_RUOLO[chiuso].lower()} chiuso.</b> "
+            f"Si passa ai {PLURALE_RUOLO[reparto].lower() if reparto else '—'}."
+        )
+    if reparto:
+        mancanti = stato.slot_mancanti(mia)[reparto] if mia else 0
+        ancora = sum(
+            stato.slot_mancanti(s).get(reparto, 0) for s in stato.squadre
+        )
+        righe.append(
+            f"<b>Si chiamano {PLURALE_RUOLO[reparto].lower()}</b>"
+            f"  <i>te ne mancano {mancanti}, alla lega {ancora}</i>"
+        )
+    else:
+        righe.append(
+            "<b>Chiamata libera</b>  <i>ogni reparto e' aperto</i>\n"
+            "<i>Se la tua asta va a reparti — prima i portieri, poi i "
+            "difensori — accendilo con <code>/reparto p</code>: da li' in poi "
+            "avanza da solo.</i>"
+        )
+    if mia is not None:
+        righe.append(
+            f"<code>hai {stato.crediti_residui(mia)} crediti · "
+            f"{stato.slot_mancanti_totali(mia)} slot</code>"
+        )
+
+    if scelte:
+        righe.append("\n<b>Chiama uno di questi</b>")
+        righe.append("<code>   nome            serve  vale</code>")
+        for c in scelte:
+            g = c.valutazione.giocatore
+            righe.append(
+                f"<code>{segno_campo(g)}{SIMBOLO_RUOLO[g.ruolo]} "
+                f"{g.nome[:14]:<14} {c.serve:>5} {c.valutazione.valore:>5.0f}</code>"
+                f"  <i>{len(c.rivali)} rivali</i>"
+            )
+    else:
+        righe.append(
+            "\n<b>Niente che convenga chiamare adesso.</b>\n"
+            "<i>Tutto quello che ti serve costa piu' di quanto vale: e' il "
+            "momento di far spendere gli altri.</i>"
+        )
+
+    if esche:
+        righe.append("\n<b>Oppure un'esca — falli spendere</b>")
+        for e in esche:
+            g = e.valutazione.giocatore
+            righe.append(
+                f"<code>{SIMBOLO_RUOLO[g.ruolo]} {g.nome[:14]:<14} "
+                f"~{e.drenati:>3} crediti</code>  <i>{len(e.rivali)} lo vogliono</i>"
+            )
+        righe.append(f"<i>{esche[0].rischio}.</i>")
     return "\n".join(righe)
 
 
