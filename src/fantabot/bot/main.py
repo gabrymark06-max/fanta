@@ -23,6 +23,7 @@ from io import BytesIO
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
+from telegram.error import NetworkError
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -42,6 +43,7 @@ from ..motore import formazione as fmz
 from ..motore.valutazione import RUOLI, ParametriLega
 from ..servizio import Servizio
 from . import formato, regole
+from .rete import RichiestaOstinata
 
 logging.basicConfig(
     format="%(asctime)s %(levelname)s %(name)s — %(message)s", level=logging.INFO
@@ -1254,11 +1256,29 @@ async def bottone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def errore(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Dire cosa e' successo davvero, che non e' sempre «non ha funzionato».
+
+    Un errore di RETE arriva quasi sempre mentre si spedisce la risposta,
+    cioe' DOPO che il comando ha fatto il suo lavoro. Chiamarlo «qualcosa e'
+    andato storto» invita a riscrivere il comando — e un acquisto registrato
+    due volte e' peggio di una conferma non arrivata.
+    """
     log.exception("errore non gestito", exc_info=context.error)
-    if isinstance(update, Update) and update.effective_message:
-        await update.effective_message.reply_text(
-            "Qualcosa e' andato storto. Riprova, e se insiste guarda i log."
+    if not (isinstance(update, Update) and update.effective_message):
+        return
+    if isinstance(context.error, NetworkError):
+        testo = (
+            "Il collegamento con Telegram e' caduto un attimo mentre "
+            "rispondevo.\n<b>Quello che mi hai chiesto potrebbe essere gia' "
+            "fatto</b>: controlla con /rosa o /squadre prima di riscriverlo."
         )
+    else:
+        testo = "Qualcosa e' andato storto. Riprova, e se insiste guarda i log."
+    await context.bot.send_message(
+        chat_id=update.effective_message.chat_id,
+        text=testo,
+        parse_mode=ParseMode.HTML,
+    )
 
 
 def costruisci(
@@ -1278,7 +1298,16 @@ def costruisci(
             "copia il token in un file .env accanto a questo progetto:\n"
             "  TELEGRAM_BOT_TOKEN=123456:ABC...\n"
         )
-    app = Application.builder().token(cfg.token_telegram).build()
+    # Il trasporto che riprova: dove il bot gira dietro un proxy condiviso,
+    # un 503 di mezzo secondo non deve diventare un errore in faccia a chi sta
+    # facendo l'asta.
+    app = (
+        Application.builder()
+        .token(cfg.token_telegram)
+        .request(RichiestaOstinata())
+        .get_updates_request(RichiestaOstinata())
+        .build()
+    )
     servizio_ = Servizio(conn or connetti())
     app.bot_data[CHIAVE_SERVIZIO] = servizio_
     app.bot_data[CHIAVE_LEGGE_DA_SOLO] = aggiorna_da_solo
