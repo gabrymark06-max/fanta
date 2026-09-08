@@ -505,6 +505,48 @@ class Servizio:
             for sigla, p in partite.items()
         }
 
+    def cosa_si_perde(self, lega: Lega) -> dict[str, int]:
+        """Quanto costa un azzeramento, prima di farlo.
+
+        Chiedere «sei sicuro?» senza dire di cosa non e' una domanda: e' un
+        ostacolo. I numeri qui sotto sono l'unica cosa che rende quella
+        conferma una decisione invece di un riflesso.
+        """
+        conta = {}
+        conta["acquisti"] = self.conn.execute(
+            "SELECT COUNT(*) FROM acquisti WHERE id_lega = ?", (lega.id,)
+        ).fetchone()[0]
+        conta["preferenze"] = self.conn.execute(
+            "SELECT COUNT(*) FROM preferenze WHERE id_lega = ?", (lega.id,)
+        ).fetchone()[0]
+        conta["crediti"] = self.conn.execute(
+            "SELECT COALESCE(SUM(prezzo), 0) FROM acquisti WHERE id_lega = ?",
+            (lega.id,),
+        ).fetchone()[0]
+        return conta
+
+    def azzera_asta(self, lega: Lega, anche_obiettivi: bool = True) -> dict[str, int]:
+        """Cancella l'asta e lascia in piedi tutto il resto.
+
+        COSA RESTA, e non per pigrizia: le regole della lega, i nomi degli
+        avversari, il foglio delle fasce che hai caricato tu, e i dati letti
+        dal mondo. Sono le cose che rifare costa tempo o che non si possono
+        rifare affatto — mentre gli acquisti, in una prova, sono esattamente
+        quello che vuoi buttare.
+        """
+        perso = self.cosa_si_perde(lega)
+        with transazione(self.conn) as c:
+            c.execute("DELETE FROM acquisti WHERE id_lega = ?", (lega.id,))
+            if anche_obiettivi:
+                c.execute("DELETE FROM preferenze WHERE id_lega = ?", (lega.id,))
+            else:
+                perso["preferenze"] = 0
+            c.execute(
+                "UPDATE leghe SET turno = 0, reparto = '' WHERE id = ?", (lega.id,)
+            )
+        self.invalida_cache()
+        return perso
+
     def quando_sono_arrivati(self) -> str:
         """L'ultima volta che il listone e' stato scritto, come la scrive SQLite.
 

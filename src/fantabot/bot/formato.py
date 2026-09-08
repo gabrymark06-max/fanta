@@ -728,7 +728,8 @@ def aiuto() -> str:
         "<b>Se sbagli</b>\n"
         "/annulla — cancella l'ultima assegnazione\n"
         "/annulla <code>vlahovic</code> — cancella quella, anche se non e' l'ultima\n"
-        "/correggi <code>vlahovic 32</code> — cambia solo il prezzo\n\n"
+        "/correggi <code>vlahovic 32</code> — cambia solo il prezzo\n"
+        "/azzera — cancella le rose e ricomincia (chiede conferma)\n\n"
         "<b>Configurazione</b>\n"
         "/setup <code>500 8 3-8-8-6</code> — crediti, squadre, slot\n"
         "/squadre <code>Marco, Luca, ...</code> — nomi degli avversari\n"
@@ -785,6 +786,46 @@ def esito_import(esito) -> str:
             + "</i>\nControlla che sia lo stesso listone: /aggiorna lo riallinea."
         )
     return "\n".join(righe)
+
+
+def conferma_azzera(perso: dict, nome_lega: str = "") -> str:
+    """Cosa sparisce, prima di far sparire qualcosa.
+
+    Una conferma che non dice i numeri non e' una domanda, e' un ostacolo: si
+    clicca senza leggere. Qui invece si legge quanto si butta, e se non c'e'
+    niente da buttare lo si dice invece di chiedere.
+    """
+    if not perso.get("acquisti") and not perso.get("preferenze"):
+        return (
+            "<b>Non c'e' niente da azzerare.</b>\n"
+            "<i>Nessun acquisto registrato e nessun obiettivo.</i>"
+        )
+    righe = ["<b>Azzero l'asta?</b>", ""]
+    if perso.get("acquisti"):
+        righe.append(
+            f"<code>{perso['acquisti']} acquisti  ·  "
+            f"{perso['crediti']} crediti spesi</code>"
+        )
+    if perso.get("preferenze"):
+        righe.append(f"<code>{perso['preferenze']} fra obiettivi ed evitati</code>")
+    righe += [
+        "",
+        "<b>Restano:</b> le regole della lega, i nomi degli avversari, il "
+        "foglio delle fasce che hai caricato, e tutti i dati sui giocatori.",
+        "",
+        "<i>Si cancellano solo le rose. Non si torna indietro.</i>",
+    ]
+    return "\n".join(righe)
+
+
+def azzerata(perso: dict) -> str:
+    return (
+        "<b>Asta azzerata.</b>\n"
+        f"<code>via {perso.get('acquisti', 0)} acquisti e "
+        f"{perso.get('preferenze', 0)} preferenze</code>\n\n"
+        "<i>Le regole e il foglio delle fasce sono al loro posto: puoi "
+        "ricominciare subito.</i>"
+    )
 
 
 def dati_da_fuori(quando: str) -> str:

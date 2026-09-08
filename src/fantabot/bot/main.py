@@ -726,6 +726,33 @@ async def cmd_importa(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     await _rispondi(update, formato.stato_import(riassunto(srv.conn)))
 
 
+async def cmd_azzera(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Cancella le rose e lascia in piedi regole, nomi e foglio delle fasce.
+
+    CHIEDE PRIMA, e chiede mostrando i numeri. Fino a ieri l'unico modo di
+    ripulire era rifare /setup, che cancellava gli acquisti come effetto
+    collaterale di un comando che serve ad altro: il tipo di scorciatoia che
+    prima o poi ti porta via una rosa vera credendo di cambiare i crediti.
+    """
+    lega = await _lega_o_avviso(update, context)
+    if lega is None:
+        return
+    srv = servizio(context)
+    perso = srv.cosa_si_perde(lega)
+    if not perso["acquisti"] and not perso["preferenze"]:
+        await _rispondi(update, formato.conferma_azzera(perso))
+        return
+    bottoni = InlineKeyboardMarkup(
+        [
+            [InlineKeyboardButton("Sì, azzera l'asta", callback_data="z:si")],
+            [InlineKeyboardButton("No, lascia stare", callback_data="z:no")],
+        ]
+    )
+    await _rispondi(
+        update, formato.conferma_azzera(perso, lega.nome), reply_markup=bottoni
+    )
+
+
 async def cmd_fuorilista(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Chi c'e' nel listone ma non nelle fasce: non lo consiglio piu'."""
     lega = await _lega_o_avviso(update, context)
@@ -1204,6 +1231,13 @@ async def bottone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await _registra(
             update, context, lega, int(pezzi[1]), int(pezzi[3]), int(pezzi[2])
         )
+    elif pezzi[0] == "z":
+        if pezzi[1] != "si":
+            await _rispondi(update, "Non ho toccato niente.")
+            return
+        srv = servizio(context)
+        perso = srv.azzera_asta(lega)
+        await _rispondi(update, formato.azzerata(perso))
     elif pezzi[0] == "p":
         srv = servizio(context)
         id_fc, grado = int(pezzi[1]), int(pezzi[2])
@@ -1279,6 +1313,7 @@ def costruisci(
     app.add_handler(CommandHandler("piano", cmd_piano))
     app.add_handler(CommandHandler("importa", cmd_importa))
     app.add_handler(CommandHandler(["fuorilista", "fuori"], cmd_fuorilista))
+    app.add_handler(CommandHandler(["azzera", "reset"], cmd_azzera))
     app.add_handler(CommandHandler("lista", cmd_lista))
     app.add_handler(CommandHandler("target", cmd_target))
     app.add_handler(CommandHandler("evita", cmd_evita))
